@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>有时间戳的留言墙</title>
+    <style>
+        body {
+            background: #f0f2f5;
+            font-family: Arial;
+            max-width: 500px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        .input-area {
+            background: white;
+            padding: 20px;
+            border-radius: 15px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+            margin-bottom: 20px;
+        }
+        input {
+            width: 70%;
+            padding: 12px;
+            border: 1px solid #ddd;
+            border-radius: 25px;
+            font-size: 16px;
+        }
+        button {
+            padding: 12px 20px;
+            background: #4caf50;
+            color: white;
+            border: none;
+            border-radius: 25px;
+            font-size: 16px;
+            cursor: pointer;
+        }
+        .msg-item {
+            background: white;
+            padding: 15px 20px;
+            border-radius: 12px;
+            margin-bottom: 10px;
+            box-shadow: 0 1px 4px rgba(0,0,0,0.05);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .msg-content {
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+        }
+        .msg-text {
+            font-size: 16px;
+            font-weight: bold;
+        }
+        .msg-time {
+            font-size: 12px;
+            color: #999;
+        }
+        .del-btn {
+            background: #ff6b6b;
+            color: white;
+            border: none;
+            border-radius: 20px;
+            padding: 5px 15px;
+            cursor: pointer;
+            flex-shrink: 0;
+        }
+        #status {
+            color: #888;
+            font-size: 14px;
+            margin-top: 10px;
+        }
+    </style>
+</head>
+<body>
+
+<div class="input-area">
+    <h2>🕒 带时间的留言墙</h2>
+    <input id="msgInput" type="text" placeholder="写点什么...">
+    <button onclick="addMessage()">发布</button>
+</div>
+
+<div id="wall"></div>
+<div id="status">加载中...</div>
+
+<script>
+    const API_URL = '/msgs';
+
+    async function loadMessages() {
+        try {
+            const res = await fetch(API_URL);
+            const data = await res.json();
+            renderWall(data);
+            document.getElementById('status').innerText = '✅ 已同步';
+        } catch (e) {
+            document.getElementById('status').innerText = '❌ 连接不上服务器';
+        }
+    }
+
+    function renderWall(messages) {
+        let wallDiv = document.getElementById('wall');
+        wallDiv.innerHTML = '';
+        for (let i = 0; i < messages.length; i++) {
+            let item = messages[i]; // 这里拿到的就是“档案袋”
+            let msgDiv = document.createElement('div');
+            msgDiv.className = 'msg-item';
+            
+            // 【核心改动】显示文字 + 时间
+            msgDiv.innerHTML = `
+                <div class="msg-content">
+                    <span class="msg-text">${item.text}</span>
+                    <span class="msg-time">📅 ${item.time}</span>
+                </div>
+                <button class="del-btn" onclick="deleteMessage(${i})">删除</button>
+            `;
+            wallDiv.appendChild(msgDiv);
+        }
+    }
+
+    async function addMessage() {
+        let input = document.getElementById('msgInput');
+        let text = input.value.trim();
+        if (text === '') { alert('写点东西！'); return; }
+
+        try {
+            const res = await fetch(API_URL, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ text: text }) // 只把文字发给管家，时间由管家生成
+            });
+            const result = await res.json();
+            if (result.success) {
+                renderWall(result.messages);
+                input.value = '';
+                document.getElementById('status').innerText = '✅ 发布成功！';
+            }
+        } catch (e) {
+            alert('发布失败');
+        }
+    }
+
+    async function deleteMessage(index) {
+        // 同样因为免费版没单独删接口，为保持极简，我们依然只刷新（先让你看到时间功能完美运行）
+        alert('删除功能暂未接入云端，刷新后数据会回来。但重点是看时间戳！');
+        loadMessages();
+    }
+
+    loadMessages();
+</script>
+
+</body>
+</html>
