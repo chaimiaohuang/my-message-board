@@ -1,19 +1,18 @@
 const http = require('http');
 const fs = require('fs');
 const url = require('url');
+const path = require('path');
 
 const DATA_FILE = './data.json';
 
-// 读取存档
+// 读取留言数据
+// 强制从空数组开始，忽略旧数据
 let messages = [];
 if (fs.existsSync(DATA_FILE)) {
-    try {
-        const content = fs.readFileSync(DATA_FILE, 'utf-8');
-        messages = JSON.parse(content);
-    } catch (e) { messages = []; }
-} else {
-    fs.writeFileSync(DATA_FILE, JSON.stringify(messages));
+    // 如果有旧文件，直接删掉重建
+    fs.unlinkSync(DATA_FILE);
 }
+fs.writeFileSync(DATA_FILE, JSON.stringify(messages));
 
 function saveData() {
     fs.writeFileSync(DATA_FILE, JSON.stringify(messages));
@@ -24,39 +23,27 @@ const server = http.createServer((req, res) => {
     res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
 
     const parsedUrl = url.parse(req.url, true);
-    const path = parsedUrl.pathname;
+    const pathname = parsedUrl.pathname;
 
-    if (req.method === 'GET' && path === '/') {
-        fs.readFile('./index.html', (err, data) => {
-            if (err) {
-                res.writeHead(404);
-                res.end('找不到 index.html');
-                return;
-            }
-            res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
-            res.end(data);
-        });
-        return;
-    }
-
-    if (req.method === 'GET' && path === '/msgs') {
+    // API 路由：获取留言
+    if (req.method === 'GET' && pathname === '/msgs') {
         res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
         res.end(JSON.stringify(messages));
         return;
     }
 
-    if (req.method === 'POST' && path === '/msgs') {
+    // API 路由：发布留言
+    if (req.method === 'POST' && pathname === '/msgs') {
         let body = '';
         req.on('data', chunk => { body += chunk; });
         req.on('end', () => {
             try {
                 const newMsg = JSON.parse(body);
-                // 【核心改动】不再只存文字，而是存一个“档案袋”！
-                // 包含 text（文字）和 time（当前北京时间）
-                const msgToSave = {
-                    text: newMsg.text,
-                    time: new Date().toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai' })
-                };
+    const msgToSave = {
+    text: newMsg.text,
+    name: newMsg.name || '匿名',  // 如果没传名字，默认“匿名”
+    time: new Date().toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai' })
+};
                 messages.push(msgToSave);
                 saveData();
                 res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
@@ -69,10 +56,41 @@ const server = http.createServer((req, res) => {
         return;
     }
 
-    res.writeHead(404);
-    res.end('Not Found');
+    // ✅ 新增：静态文件服务（处理图片、CSS等）
+    const filePath = path.join(__dirname, pathname);
+    fs.readFile(filePath, (err, data) => {
+        if (err) {
+            // 文件不存在时，返回 index.html（让前端路由继续工作）
+            fs.readFile('./index.html', (err2, indexData) => {
+                if (err2) {
+                    res.writeHead(404);
+                    res.end('Not Found');
+                    return;
+                }
+                res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
+                res.end(indexData);
+            });
+            return;
+        }
+
+        // 根据文件扩展名返回正确的 MIME 类型
+        const ext = path.extname(filePath).toLowerCase();
+        const mimeTypes = {
+            '.html': 'text/html',
+            '.css': 'text/css',
+            '.js': 'application/javascript',
+            '.jpg': 'image/jpeg',
+            '.jpeg': 'image/jpeg',
+            '.png': 'image/png',
+            '.gif': 'image/gif',
+            '.json': 'application/json',
+        };
+        const contentType = mimeTypes[ext] || 'application/octet-stream';
+        res.writeHead(200, { 'Content-Type': contentType });
+        res.end(data);
+    });
 });
 
 server.listen(3000, '0.0.0.0', () => {
-    console.log('✅ 云留言板已启动（带时间版本）！');
+    console.log('✅ 云留言板已启动（带静态文件服务）！');
 });
