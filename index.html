@@ -14,6 +14,26 @@
             position: relative;
             background-color: #0a1208;
         }
+/* 针对小屏幕手机优化 */
+@media (max-width: 480px) {
+    body {
+        padding: 10px;
+    }
+    .input-area {
+        padding: 15px;
+    }
+    input {
+        width: 60%;      /* 输入框宽度调小一点，给按钮留空间 */
+        font-size: 14px;
+    }
+    button {
+        font-size: 14px;
+        padding: 10px 16px;
+    }
+    .msg-item {
+        padding: 12px 14px;
+    }
+}
 
         /* ----- 背景层（模糊） ----- */
         body::before {
